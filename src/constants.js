@@ -23,3 +23,21 @@ export const WALL_HEIGHT = 24;
 export const WALL_WIDTH = 40;
 export const WALL_DEPTH = 60;
 export const WALL_CELL_SIZE = 2;
+
+// Mouse input. Raw movementX/Y is multiplied by this and nothing else —
+// no smoothing, no acceleration. There is no UI to change it.
+export const SENSITIVITY = 1.0;
+export const PITCH_LIMIT_DEG = 89;
+
+// Targets
+export const TARGET_RADIUS = 0.5;
+export const TARGET_COLOR = 0xff5555;
+export const TARGET_SEGMENTS = 24;
+
+// A 3D volume, not a wall: z varies so target distance genuinely differs
+// between attempts. Radius never scales with distance.
+export const SPAWN_VOLUME = { xMin: -8, xMax: 8, yMin: -4, yMax: 4, zMin: -25, zMax: -8 };
+export const MIN_SPAWN_DISTANCE = 5;
+
+// Crosshair hit/miss flash duration
+export const FEEDBACK_FLASH_MS = 90;
