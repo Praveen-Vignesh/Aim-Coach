@@ -68,6 +68,11 @@ export function createGame({ scene, camera, crosshair, hud }) {
     const timeToClickMs = Math.round(performance.now() - spawnTimestamp);
     const targetDistance = camera.position.distanceTo(target.position);
 
+    // The camera has rotated since the last render, so recompose its world
+    // matrix before the ray is cast. Without this the shot is judged against
+    // last frame's aim, losing any mouse movement that arrived since.
+    camera.updateMatrixWorld();
+
     raycaster.setFromCamera(SCREEN_CENTER, camera);
     _intersections.length = 0;
     raycaster.intersectObject(target, false, _intersections);
