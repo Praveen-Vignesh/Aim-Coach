@@ -41,3 +41,9 @@ export const MIN_SPAWN_DISTANCE = 5;
 
 // Crosshair hit/miss flash duration
 export const FEEDBACK_FLASH_MS = 90;
+
+// Bot Mode flick timing. The upper bound grows with the angular distance to the
+// target, so far targets take slightly longer, as they do for a human.
+export const BOT_FLICK_MIN_MS = 150;
+export const BOT_FLICK_MAX_MS = 350;
+export const BOT_FLICK_MS_PER_RADIAN = 120;

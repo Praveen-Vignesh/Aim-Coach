@@ -26,6 +26,8 @@ export function createTelemetry() {
 
 export function buildPayload({
   sessionId,
+  isHuman,
+  botMode,
   targetDistance,
   timeToClickMs,
   clickResult,
@@ -34,8 +36,8 @@ export function buildPayload({
 }) {
   return {
     session_id: sessionId,
-    is_human: true,
-    bot_mode: null,
+    is_human: isHuman,
+    bot_mode: botMode,
     target_distance: targetDistance,
     time_to_click_ms: timeToClickMs,
     click_result: clickResult,

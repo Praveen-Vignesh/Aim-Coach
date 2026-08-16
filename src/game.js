@@ -14,7 +14,7 @@ const _up = new Vector3();
 const _point = new Vector3();
 const _intersections = [];
 
-export function createGame({ scene, camera, crosshair, hud }) {
+export function createGame({ scene, camera, crosshair, hud, bot = null }) {
   const target = createTarget();
   target.visible = false;
   scene.add(target);
@@ -35,6 +35,8 @@ export function createGame({ scene, camera, crosshair, hud }) {
     target.visible = true;
     spawnTimestamp = performance.now();
     telemetry.beginAttempt(spawnTimestamp);
+
+    if (bot !== null) bot.beginFlick(camera, target.position, spawnTimestamp);
   }
 
   function flash(result) {
@@ -62,15 +64,13 @@ export function createGame({ scene, camera, crosshair, hud }) {
     telemetry.record(event.movementX, event.movementY);
   }
 
-  function onMouseDown(event) {
-    if (running === false || event.button !== 0) return;
-
+  function shoot() {
     const timeToClickMs = Math.round(performance.now() - spawnTimestamp);
     const targetDistance = camera.position.distanceTo(target.position);
 
-    // The camera has rotated since the last render, so recompose its world
-    // matrix before the ray is cast. Without this the shot is judged against
-    // last frame's aim, losing any mouse movement that arrived since.
+    // The camera has rotated since the last render — from mouse movement, or
+    // from the bot's final frame — so recompose its world matrix before the ray
+    // is cast. Without this the shot is judged against last frame's aim.
     camera.updateMatrixWorld();
 
     raycaster.setFromCamera(SCREEN_CENTER, camera);
@@ -93,6 +93,8 @@ export function createGame({ scene, camera, crosshair, hud }) {
     insertTelemetry(
       buildPayload({
         sessionId,
+        isHuman: bot === null,
+        botMode: bot === null ? null : bot.mode,
         targetDistance,
         timeToClickMs,
         clickResult: isHit ? 'hit' : 'miss',
@@ -102,9 +104,29 @@ export function createGame({ scene, camera, crosshair, hud }) {
     );
   }
 
+  // In Bot Mode the bot pulls the trigger, so a stray human click cannot
+  // contaminate a flick that is still in progress.
+  function onMouseDown(event) {
+    if (running === false || bot !== null || event.button !== 0) return;
+    shoot();
+  }
+
   document.addEventListener('mousedown', onMouseDown);
 
   return {
+    // Drives the bot's flick one frame at a time. The emitted deltas are the
+    // only telemetry recorded in Bot Mode, so the buffer describes the bot's
+    // rotation rather than the hand on the desk. Frames that round to no
+    // movement are skipped, exactly as a real mouse reports nothing.
+    update(now) {
+      if (running === false || bot === null) return;
+
+      const step = bot.advance(camera, now);
+      if (step === null) return;
+
+      if (step.dx !== 0 || step.dy !== 0) telemetry.record(step.dx, step.dy);
+      if (step.done) shoot();
+    },
     start() {
       sessionId = crypto.randomUUID();
       hits = 0;
@@ -113,7 +135,7 @@ export function createGame({ scene, camera, crosshair, hud }) {
       hud.update({ hits, attempts, totalTimeMs });
 
       running = true;
-      document.addEventListener('mousemove', onMouseMove);
+      if (bot === null) document.addEventListener('mousemove', onMouseMove);
       spawn();
     },
     stop() {

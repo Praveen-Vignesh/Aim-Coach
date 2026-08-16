@@ -62,6 +62,26 @@ The static bundle is emitted to `dist/`. Preview it with:
 npm run preview
 ```
 
+## Bot Mode
+
+Bot Mode replaces the player with a programmatic driver that flicks to each
+target and clicks it, to generate labeled non-human telemetry. It is hidden:
+enable it with a query parameter.
+
+```
+http://localhost:5173/?bot=linear
+http://localhost:5173/?bot=smoothed
+```
+
+- `linear` — constant angular velocity straight to the target, zero jerk.
+- `smoothed` — cubic Bezier ease-in-out, smooth acceleration and deceleration.
+
+Click once to lock the pointer, then the bot plays on its own; real mouse
+movement and clicks are ignored while it runs. Flick duration is randomized per
+attempt and stretches slightly with angular distance. Rows from Bot Mode carry
+`is_human = false` and `bot_mode = 'linear'` or `'smoothed'`; every human row is
+`is_human = true` with a null `bot_mode`.
+
 ## Telemetry
 
 One row lands in `telemetry_logs` per attempt, containing the session id, the
