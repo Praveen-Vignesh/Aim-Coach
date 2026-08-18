@@ -1,16 +1,11 @@
 import { Euler, Vector3 } from 'three';
 import {
-  SENSITIVITY,
   BOT_FLICK_MIN_MS,
   BOT_FLICK_MAX_MS,
   BOT_FLICK_MS_PER_RADIAN
 } from './constants.js';
 
 const BOT_MODES = ['linear', 'smoothed'];
-
-// Mirrors the radians-per-pixel factor PointerLockControls applies to
-// movementX/Y, so driven rotation can be reported back as mouse deltas.
-const RADIANS_PER_PIXEL = 0.002 * SENSITIVITY;
 
 const _euler = new Euler(0, 0, 0, 'YXZ');
 const _direction = new Vector3();
@@ -30,7 +25,11 @@ function easeInOut(t) {
   return t * t * (3 - 2 * t);
 }
 
-export function createBot(mode) {
+// radiansPerMovementUnit must be the same value controls.js derived for the
+// player, or synthetic deltas stop matching real ones. Both come from
+// sensitivity.js so there is one source of truth.
+export function createBot(mode, radiansPerMovementUnit) {
+  let rate = radiansPerMovementUnit;
   let startYaw = 0;
   let startPitch = 0;
   let deltaYaw = 0;
@@ -45,6 +44,11 @@ export function createBot(mode) {
 
   return {
     mode,
+
+    // Kept in step with the player's sensitivity while the bot is alive.
+    setRadiansPerMovementUnit(value) {
+      rate = value;
+    },
 
     // Aims at the target center: the yaw/pitch the camera must reach, and how
     // long this flick will take.
@@ -95,8 +99,8 @@ export function createBot(mode) {
       // A real mouse reports whole counts, so these are rounded — and the
       // rounding error is carried into the next frame, which keeps the emitted
       // deltas summing to exactly the rotation performed.
-      const exactX = -stepYaw / RADIANS_PER_PIXEL + carryX;
-      const exactY = -stepPitch / RADIANS_PER_PIXEL + carryY;
+      const exactX = -stepYaw / rate + carryX;
+      const exactY = -stepPitch / rate + carryY;
       const dx = Math.round(exactX);
       const dy = Math.round(exactY);
       carryX = exactX - dx;

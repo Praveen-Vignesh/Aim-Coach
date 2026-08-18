@@ -24,12 +24,22 @@ export const WALL_WIDTH = 40;
 export const WALL_DEPTH = 60;
 export const WALL_CELL_SIZE = 2;
 
-// Mouse input. Raw movementX/Y is multiplied by this and nothing else —
-// no smoothing, no acceleration. There is no UI to change it.
-export const SENSITIVITY = 1.0;
+// Mouse input. Sensitivity is expressed on the Valorant scale and turned into a
+// camera rotation rate by sensitivity.js. No smoothing or acceleration is ever
+// applied. These are starting values — the home screen overrides and persists.
+export const DEFAULT_DPI = 800;
+export const DEFAULT_SENSITIVITY = 0.4;
 export const PITCH_LIMIT_DEG = 89;
 
-// Targets
+// Counts per unit of reported movementX/Y. Leave at 1 unless a measured 360 on
+// the mousepad disagrees with the cm/360 shown on the settings panel.
+export const MOUSE_COUNT_SCALE = 1;
+
+// Session defaults, overridden by the home screen.
+export const DEFAULT_DIFFICULTY = 'medium';
+export const DEFAULT_ROUTINE = 'flick';
+
+// Targets. Radius is a fallback: the active difficulty supplies the real one.
 export const TARGET_RADIUS = 0.5;
 export const TARGET_COLOR = 0xff5555;
 export const TARGET_SEGMENTS = 24;

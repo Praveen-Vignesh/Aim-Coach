@@ -10,6 +10,7 @@ body {
   height: 100%;
   overflow: hidden;
   background: #1a1a1a;
+  color: #dcdcdc;
   font-family: Consolas, "Courier New", monospace;
 }
 
@@ -18,6 +19,8 @@ body {
   width: 100%;
   height: 100%;
 }
+
+/* Crosshair */
 
 #crosshair {
   position: fixed;
@@ -62,12 +65,13 @@ body {
   background: #888888;
 }
 
+/* HUD */
+
 #hud {
   position: fixed;
   top: 16px;
   left: 16px;
   pointer-events: none;
-  color: #dcdcdc;
   font-size: 14px;
   line-height: 1.7;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
@@ -83,33 +87,250 @@ body {
   color: #8c8c8c;
 }
 
-#overlay {
+.hud-mode-row {
+  margin-bottom: 6px;
+  color: #ff8080;
+}
+
+/* Screens */
+
+.screen {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 10, 10, 0.72);
-  color: #e8e8e8;
-  cursor: pointer;
-  user-select: none;
+  padding: 24px;
+  overflow-y: auto;
+  background: rgba(10, 10, 10, 0.86);
 }
 
-#overlay.hidden {
+.screen.hidden {
   display: none;
 }
 
-#overlay-panel {
+.panel {
+  width: 100%;
+  max-width: 640px;
+  border: 1px solid #333333;
+  background: #161616;
+  padding: 28px;
+}
+
+.panel.narrow {
+  max-width: 320px;
   text-align: center;
 }
 
-#overlay-title {
-  font-size: 34px;
-  letter-spacing: 2px;
+.panel-head {
+  margin-bottom: 24px;
 }
 
-#overlay-hint {
+h1 {
+  font-size: 26px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+h2 {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8c8c8c;
+  margin-bottom: 10px;
+}
+
+section {
+  margin-bottom: 24px;
+}
+
+.muted {
+  color: #8c8c8c;
+}
+
+.note {
   margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6f6f6f;
+}
+
+code {
+  color: #b9b9b9;
+}
+
+/* Routine grid */
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.mode-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  text-align: left;
+  font: inherit;
+  color: #dcdcdc;
+  background: #1e1e1e;
+  border: 1px solid #333333;
+  cursor: pointer;
+}
+
+.mode-tile:hover:not(:disabled) {
+  border-color: #5a5a5a;
+}
+
+.mode-tile.selected {
+  border-color: #ff5555;
+  background: #241a1a;
+}
+
+.mode-tile:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mode-name {
   font-size: 14px;
-  color: #9a9a9a;
+}
+
+.mode-blurb {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8c8c8c;
+}
+
+.mode-tag {
+  align-self: flex-start;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #6f6f6f;
+  border: 1px solid #3a3a3a;
+  padding: 1px 6px;
+}
+
+.mode-tile.selected .mode-tag {
+  color: #ff8080;
+  border-color: #6a3535;
+}
+
+/* Difficulty */
+
+.segmented {
+  display: flex;
+  gap: 8px;
+}
+
+.segment {
+  flex: 1;
+  padding: 10px;
+  font: inherit;
+  font-size: 13px;
+  text-transform: capitalize;
+  color: #dcdcdc;
+  background: #1e1e1e;
+  border: 1px solid #333333;
+  cursor: pointer;
+}
+
+.segment:hover {
+  border-color: #5a5a5a;
+}
+
+.segment.selected {
+  border-color: #ff5555;
+  background: #241a1a;
+}
+
+/* Settings fields */
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.field input {
+  width: 120px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: #dcdcdc;
+  background: #101010;
+  border: 1px solid #333333;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #ff5555;
+}
+
+.readout {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.readout > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  font-size: 12px;
+  background: #101010;
+  border: 1px solid #2a2a2a;
+}
+
+.readout strong {
+  font-size: 18px;
+  font-weight: normal;
+  color: #ffffff;
+}
+
+/* Buttons */
+
+button.primary,
+button.secondary {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+button.primary {
+  color: #1a1a1a;
+  background: #ff5555;
+  border: 1px solid #ff5555;
+}
+
+button.primary:hover {
+  background: #ff7070;
+}
+
+button.secondary {
+  margin-top: 8px;
+  color: #dcdcdc;
+  background: transparent;
+  border: 1px solid #333333;
+}
+
+button.secondary:hover {
+  border-color: #5a5a5a;
+}
+
+.panel.narrow h2 {
+  margin-bottom: 18px;
 }

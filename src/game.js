@@ -1,8 +1,9 @@
 import { Raycaster, Vector2, Vector3 } from 'three';
-import { createTarget, spawnTarget } from './target.js';
+import { createRoutine } from './routines/index.js';
+import { configFor } from './difficulty.js';
 import { createTelemetry, buildPayload } from './telemetry.js';
 import { insertTelemetry } from './supabase.js';
-import { FEEDBACK_FLASH_MS } from './constants.js';
+import { FEEDBACK_FLASH_MS, DEFAULT_ROUTINE, DEFAULT_DIFFICULTY } from './constants.js';
 
 const SCREEN_CENTER = new Vector2(0, 0);
 const WORLD_UP = new Vector3(0, 1, 0);
@@ -14,29 +15,36 @@ const _up = new Vector3();
 const _point = new Vector3();
 const _intersections = [];
 
+// Hosts whichever routine is active: it owns the session, the raycast, the HUD
+// counters and telemetry, and asks the routine what to do with a hit or a miss.
 export function createGame({ scene, camera, crosshair, hud, bot = null }) {
-  const target = createTarget();
-  target.visible = false;
-  scene.add(target);
-
   const raycaster = new Raycaster();
   const telemetry = createTelemetry();
 
+  let routine = null;
   let running = false;
   let sessionId = null;
-  let spawnTimestamp = 0;
+  let attemptStart = 0;
   let flashTimer = 0;
   let hits = 0;
   let attempts = 0;
+  let clicks = 0;
   let totalTimeMs = 0;
 
-  function spawn() {
-    spawnTarget(target, camera.position);
-    target.visible = true;
-    spawnTimestamp = performance.now();
-    telemetry.beginAttempt(spawnTimestamp);
+  function pushHud() {
+    hud.update({ hits, attempts, clicks, totalTimeMs });
+  }
 
-    if (bot !== null) bot.beginFlick(camera, target.position, spawnTimestamp);
+  // An attempt is the span between resolutions — the time the player had to
+  // find and destroy the next target.
+  function beginAttempt(now) {
+    attemptStart = now;
+    telemetry.beginAttempt(now);
+
+    if (bot === null) return;
+
+    const aim = routine.aimTarget();
+    if (aim !== null) bot.beginFlick(camera, aim.position, now);
   }
 
   function flash(result) {
@@ -47,9 +55,9 @@ export function createGame({ scene, camera, crosshair, hud, bot = null }) {
   }
 
   // Click offset from target center, measured on the plane perpendicular to the
-  // camera-to-target vector, in world units. The target is never rotated or
-  // scaled, so its local axes stay world-aligned.
-  function computeClickOffset(worldPoint) {
+  // camera-to-target vector, in world units. Targets are never rotated or
+  // scaled, so their local axes stay world-aligned.
+  function computeClickOffset(target, worldPoint) {
     _forward.subVectors(target.position, camera.position).normalize();
     _right.crossVectors(_forward, WORLD_UP).normalize();
     _up.crossVectors(_right, _forward).normalize();
@@ -60,13 +68,21 @@ export function createGame({ scene, camera, crosshair, hud, bot = null }) {
     return { x: _point.dot(_right), y: _point.dot(_up) };
   }
 
-  function onMouseMove(event) {
-    telemetry.record(event.movementX, event.movementY);
+  // target_distance is NOT NULL in the schema, so a miss reports the closest
+  // target that was on screen rather than nothing at all.
+  function nearestTargetDistance() {
+    let nearest = 0;
+
+    for (const target of routine.targets) {
+      const distance = camera.position.distanceTo(target.position);
+      if (nearest === 0 || distance < nearest) nearest = distance;
+    }
+
+    return nearest;
   }
 
-  function shoot() {
-    const timeToClickMs = Math.round(performance.now() - spawnTimestamp);
-    const targetDistance = camera.position.distanceTo(target.position);
+  function shoot(now) {
+    const timeToClickMs = Math.round(now - attemptStart);
 
     // The camera has rotated since the last render — from mouse movement, or
     // from the bot's final frame — so recompose its world matrix before the ray
@@ -75,20 +91,27 @@ export function createGame({ scene, camera, crosshair, hud, bot = null }) {
 
     raycaster.setFromCamera(SCREEN_CENTER, camera);
     _intersections.length = 0;
-    raycaster.intersectObject(target, false, _intersections);
+    raycaster.intersectObjects(routine.targets, false, _intersections);
 
-    const isHit = _intersections.length > 0;
-    const clickOffset = isHit ? computeClickOffset(_intersections[0].point) : null;
+    const struck = _intersections.length > 0 ? _intersections[0] : null;
+    const isHit = struck !== null;
+    const targetDistance = isHit
+      ? camera.position.distanceTo(struck.object.position)
+      : nearestTargetDistance();
+    const clickOffset = isHit ? computeClickOffset(struck.object, struck.point) : null;
     const trajectory = telemetry.trajectory();
 
-    // Next target first — everything below is off the latency path.
+    // Resolve and re-arm first — everything below is off the latency path.
     flash(isHit ? 'hit' : 'miss');
-    spawn();
+    if (isHit) routine.resolveHit(struck.object, now);
+    else routine.resolveMiss(now);
+    beginAttempt(now);
 
     attempts += 1;
+    clicks += 1;
     if (isHit) hits += 1;
     totalTimeMs += timeToClickMs;
-    hud.update({ hits, attempts, totalTimeMs });
+    pushHud();
 
     insertTelemetry(
       buildPayload({
@@ -104,44 +127,70 @@ export function createGame({ scene, camera, crosshair, hud, bot = null }) {
     );
   }
 
+  function onMouseMove(event) {
+    telemetry.record(event.movementX, event.movementY);
+  }
+
   // In Bot Mode the bot pulls the trigger, so a stray human click cannot
   // contaminate a flick that is still in progress.
   function onMouseDown(event) {
     if (running === false || bot !== null || event.button !== 0) return;
-    shoot();
+    shoot(performance.now());
   }
 
   document.addEventListener('mousedown', onMouseDown);
 
   return {
-    // Drives the bot's flick one frame at a time. The emitted deltas are the
-    // only telemetry recorded in Bot Mode, so the buffer describes the bot's
-    // rotation rather than the hand on the desk. Frames that round to no
-    // movement are skipped, exactly as a real mouse reports nothing.
     update(now) {
-      if (running === false || bot === null) return;
+      if (running === false) return;
+
+      const events = routine.update(now);
+      if (events.expired > 0) {
+        // The clock took the target. It counts against accuracy, but no click
+        // happened, so it must not drag the average time-to-click around.
+        attempts += events.expired;
+        pushHud();
+        beginAttempt(now);
+      }
+
+      if (bot === null) return;
 
       const step = bot.advance(camera, now);
       if (step === null) return;
 
       if (step.dx !== 0 || step.dy !== 0) telemetry.record(step.dx, step.dy);
-      if (step.done) shoot();
+      if (step.done) shoot(now);
     },
-    start() {
+
+    // A fresh routine is built per session, so a mode or difficulty change on
+    // the home screen always takes effect on the next start.
+    start(options = {}) {
+      const routineId = options.routineId ?? DEFAULT_ROUTINE;
+      const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
+      const config = options.config ?? configFor(routineId, difficulty);
+
+      if (routine !== null) routine.stop();
+      routine = createRoutine(routineId, { scene, camera, config });
+
       sessionId = crypto.randomUUID();
       hits = 0;
       attempts = 0;
+      clicks = 0;
       totalTimeMs = 0;
-      hud.update({ hits, attempts, totalTimeMs });
+      pushHud();
 
       running = true;
       if (bot === null) document.addEventListener('mousemove', onMouseMove);
-      spawn();
+
+      const now = performance.now();
+      routine.start(now);
+      beginAttempt(now);
     },
+
     stop() {
       running = false;
       document.removeEventListener('mousemove', onMouseMove);
-      target.visible = false;
+      if (routine !== null) routine.stop();
     }
   };
 }
