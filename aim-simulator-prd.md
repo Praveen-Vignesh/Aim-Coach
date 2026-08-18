@@ -33,6 +33,11 @@ The trainer itself must feel legitimately usable — targets, hit feedback, and 
 
 ---
 
+> **v2 status:** the four phases in §8 shipped and are verified against §9. The project has
+> since been extended into a multi-routine trainer with a home screen, configurable
+> sensitivity, and a difficulty manager. Items marked **(v2)** below were out of scope for
+> the original build and are now explicitly in scope.
+
 ## 3. In Scope / Out of Scope
 
 ### In scope
@@ -45,6 +50,13 @@ The trainer itself must feel legitimately usable — targets, hit feedback, and 
 - Async batched inserts to Supabase
 - Bot Mode with linear and smoothed sub-modes
 - Basic HUD (score, accuracy, avg time to click)
+- **(v2)** Home screen for choosing a training routine and changing settings
+- **(v2)** Configurable sensitivity: mouse DPI plus in-game sens on the Valorant scale
+  (0.07°/count), with eDPI and cm/360 shown to the player
+- **(v2)** Difficulty state manager (easy / medium / hard) driving per-routine parameters
+- **(v2)** Four training routines: static flicking, dynamic reflex, reactive strafing,
+  and target switching
+- **(v2)** Multiple concurrent targets, moving targets, and target time-to-live
 
 ### Out of scope (do NOT build)
 - Python backend, FastAPI, Hugging Face Spaces
@@ -52,7 +64,6 @@ The trainer itself must feel legitimately usable — targets, hit feedback, and 
 - Groq or any LLM integration
 - Coaching report modal / K-Means archetyping
 - User authentication, user profiles, leaderboards
-- Menus, settings pages, sensitivity sliders beyond a single hardcoded value
 - Sound effects, textures, lighting beyond flat colors
 
 ---
@@ -101,7 +112,9 @@ Keep modules small and single-purpose. No god-objects.
 - Use `PointerLockControls`. On `lock`, hide the overlay and start the game. On `unlock`, pause the game and show the overlay again.
 - When requesting pointer lock, pass `{ unadjustedMovement: true }` if the browser supports it. Fall back gracefully if not.
 - **Do not** apply any smoothing, easing, or acceleration to mouse input. Raw `movementX` / `movementY` → yaw/pitch, one-to-one.
-- Hardcode a sensitivity constant in `constants.js`. No UI to change it.
+- **(v2)** Sensitivity is configured on the home screen from mouse DPI and an in-game sens
+  value on the Valorant scale, and persisted. `constants.js` holds only the defaults.
+  The conversion lives in `sensitivity.js`; the input path stays strictly one-to-one.
 - Clamp pitch to `±89°` to prevent camera flip.
 
 ### 5.3 Target Spawning (3D volume)
@@ -114,7 +127,9 @@ Keep modules small and single-purpose. No god-objects.
 - All ranges live in `constants.js` as `SPAWN_VOLUME = { xMin, xMax, yMin, yMax, zMin, zMax }`.
 - **Do not scale target size with distance.** Keep the world-space radius fixed so farther targets subtend a smaller visual angle. This is the whole point of adding Z variance — distance should genuinely affect difficulty. If you scale for constant screen size, the third axis becomes cosmetic.
 - Reject any spawn that lands within a minimum radius of the camera (e.g. `distance < 5`) so a target never spawns on top of the crosshair.
-- Only one target exists at a time. After a click (hit or miss), immediately despawn the current target and spawn the next.
+- Only one target exists at a time **in the single-target flick routine**. After a click
+  (hit or miss), immediately despawn the current target and spawn the next. **(v2)** Other
+  routines hold several targets at once and may move them; see the routine roadmap.
 
 ### 5.4 Hit Detection
 - On `mousedown` (left button) while pointer is locked: cast a ray from the camera through screen center (`(0, 0)` in NDC).
