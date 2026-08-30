@@ -84,11 +84,33 @@ attempt and stretches slightly with angular distance. Rows from Bot Mode carry
 
 ## Telemetry
 
-One row lands in `telemetry_logs` per attempt, containing the session id, the
-target distance at spawn, time to click, hit or miss, the click offset from
-target center on a hit, and the full `{t, dx, dy}` mouse trajectory for that
-attempt. Inserts are fire-and-forget: failures are logged to the console and
-never interrupt play.
+One row in `telemetry_logs` is one **segment** of play — a shape that fits every
+routine. A segment closes with an `outcome`:
+
+- `hit` / `miss` — a click in a destructible routine (flick, gridshot,
+  spidershot, switching).
+- `timeout` — a spidershot target expired before it was clicked; the failed
+  attempt is kept, not discarded.
+- `track` — a tracking routine (strafing) has no click, so it is logged in fixed
+  ~1-second windows and once more when the session ends.
+
+Every row carries the session id, the `routine` and `difficulty` it came from,
+the `outcome`, the number of targets on screen and their layout at segment start
+(`target_count`, `targets`), and — on click segments — time to click, dwell time,
+target distance, and the click offset from target center. The `trajectory` is the
+per-frame stream, one sample per rendered frame:
+
+```
+{ t, dx, dy, yaw, pitch, tx, ty, tz, on }
+```
+
+`dx`/`dy` are the raw device counts for that frame (they vary with DPI and OS
+sensitivity); `yaw`/`pitch` are the camera's resulting angles in radians, which
+are DPI-independent and the better signal for aim analysis or bot detection;
+`tx`/`ty`/`tz` are the engaged target's world position that frame — so tracking
+error is recoverable even while the target moves; and `on` is whether the
+crosshair was over a target that frame. Inserts are fire-and-forget: failures are
+logged to the console and never interrupt play.
 
 ## Notes
 

@@ -36,6 +36,7 @@ export function createSwitchingRoutine({ scene, camera, config }) {
   }
 
   return {
+    kind: 'destructible',
     targets: pool.active,
 
     start(now) {

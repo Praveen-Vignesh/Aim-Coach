@@ -11,6 +11,7 @@ export function createFlickRoutine({ scene, camera, config }) {
   }
 
   return {
+    kind: 'destructible',
     targets: pool.active,
 
     start() {

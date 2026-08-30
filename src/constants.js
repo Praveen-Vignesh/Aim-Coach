@@ -52,6 +52,10 @@ export const MIN_SPAWN_DISTANCE = 5;
 // Crosshair hit/miss flash duration
 export const FEEDBACK_FLASH_MS = 90;
 
+// Tracking routines have no click to end an attempt, so their telemetry is cut
+// into fixed windows of this length: one row per window, memory bounded.
+export const TRACK_WINDOW_MS = 1000;
+
 // Bot Mode flick timing. The upper bound grows with the angular distance to the
 // target, so far targets take slightly longer, as they do for a human.
 export const BOT_FLICK_MIN_MS = 150;

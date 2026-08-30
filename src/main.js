@@ -55,7 +55,7 @@ controls.addEventListener('lock', () => {
 
   home.setScreen('playing');
   hud.setMode(routineById(routine).name + ' · ' + difficulty);
-  game.start({ routineId: routine, config: configFor(routine, difficulty) });
+  game.start({ routineId: routine, difficulty, config: configFor(routine, difficulty) });
 });
 
 controls.addEventListener('unlock', () => {

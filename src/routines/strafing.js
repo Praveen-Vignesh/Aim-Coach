@@ -49,6 +49,9 @@ export function createStrafingRoutine({ scene, camera, config }) {
   }
 
   return {
+    // Tracking: the drill is staying on a live target, so telemetry is sampled
+    // in fixed time windows rather than per click.
+    kind: 'tracking',
     targets: pool.active,
 
     start(now) {

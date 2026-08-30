@@ -15,6 +15,7 @@ export function createSpidershotRoutine({ scene, camera, config }) {
   }
 
   return {
+    kind: 'destructible',
     targets: pool.active,
 
     start(now) {

@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨 General Agent Rules 🚨
+Before making any changes or decisions, you MUST read and follow the general agent rules located in `.claude/rules/rules.md`.
+**CRITICAL: NEVER USE GIT OR VERSION CONTROL COMMANDS.**
+
 ## Scope discipline
 
 `aim-simulator-prd.md` is the specification. v1 (§8's four phases) shipped and is verified
@@ -24,10 +28,12 @@ reflex (spidershot), reactive strafing, and target switching.
 both. `src/difficulty.js` holds every per-routine parameter. Never mark a routine
 available before its factory exists; the home screen renders straight from that flag.
 
-Two scoring shapes exist. **Destructible** routines (flick, gridshot, spidershot,
-switching) consume the target on a hit and spawn a replacement. **Tracking** routines
-(strafing) deliberately do *not* — `resolveHit` is empty, because the
-drill is staying on the target, and consuming it would turn it into a flick drill.
+Two scoring shapes exist, and each routine declares which with a `kind` field.
+**Destructible** routines (`kind: 'destructible'` — flick, gridshot, spidershot, switching)
+consume the target on a hit and spawn a replacement. **Tracking** routines
+(`kind: 'tracking'` — strafing) deliberately do *not* — `resolveHit` is empty, because the
+drill is staying on the target, and consuming it would turn it into a flick drill. `game.js`
+branches on `kind` for both scoring and telemetry (see the segment model below).
 
 ## Commands
 
@@ -56,16 +62,38 @@ active difficulty's target radius (fresh `crypto.randomUUID()` session id, HUD c
 reset, first spawn); unlock calls `game.stop()` and shows PAUSED. Re-locking always
 starts a new session — it never resumes the old one.
 
-**The attempt is the span between resolutions** — the time the player had to find and
-destroy the next target, not the life of one mesh. `beginAttempt()` stamps the clock,
-opens a fresh telemetry buffer seeded with `{t:0,dx:0,dy:0}`, and points the bot at
-`routine.aimTarget()`. A click runs `shoot()`: raycast, then **resolve the routine and
-re-arm first**, and only then update the HUD and fire the insert. Everything after
-`beginAttempt()` in `shoot()` is deliberately off the latency path.
+**One row is one *segment*, not one mesh — the unified telemetry shape.** A segment is a
+span of play that closes with an `outcome`: destructible routines close on a click
+(`hit`/`miss`) or a timeout (`timeout`); tracking routines have no click, so they close every
+`TRACK_WINDOW_MS` (`track`) and once more on `stop()`. This is what makes one table fit
+every mode — every row carries `routine`, `difficulty`, `outcome`, the board layout at
+segment start (`targets` + `target_count`), and a per-frame stream. `beginAttempt()` opens a
+segment: stamps the clock, resets dwell, snapshots the board, and points the bot at
+`routine.aimTarget()`. `flushSegment(outcome, fields)` ships the one that closed — read its
+`frames`/`board` **before** `beginAttempt()` swaps in fresh arrays, so an in-flight insert
+keeps its own array (the buffer is replaced, never emptied in place). An empty segment (no
+frame sampled yet) is never shipped.
 
-A target that expires on its own (spidershot) counts as an attempt against accuracy but
-writes **no telemetry row** — no click happened — and is excluded from the average time
-via the separate `clicks` counter the HUD receives.
+**A frame is sampled once per rendered frame, not per mousemove: `{t, dx, dy, yaw, pitch,
+tx, ty, tz, on}`.** `update()` calls `sampleFrame()` every frame *after* `routine.update()`
+has moved the targets, so the aim and the world state are recorded together — the fix for
+tracking and moving-target modes, where the target moves even when the mouse is still.
+`dx`/`dy` are the raw device counts for that frame (human: accumulated from `mousemove` into
+`pendingDx/Dy` and drained here; bot: the frame's synthetic step). `yaw`/`pitch` are the
+camera's absolute angles read off `camera.quaternion` as a `YXZ` Euler (`.y` yaw, `.x` pitch)
+— DPI-independent, sampled identically for player and bot. `tx/ty/tz` are the engaged
+(`aimTarget()`) target's world position that frame; `on` is whether the crosshair sat on any
+live target (`raycastCenter()`), which also stamps `dwellStart` on first contact. Angles are
+rounded to 5 decimals, positions to 3, in `telemetry.js`.
+
+**`dwell_ms`, `time_to_click_ms`, and `click_offset` are click-only.** They are non-null on
+`hit`/`miss` rows; `null` on `timeout` and `track` rows, which have no landed shot. `dwell_ms`
+is `now - dwellStart` (the crosshair first settling on a target until the click), or `null`
+when it never registered — which is why bot hits usually carry a null dwell.
+
+A target that expires on its own (spidershot) still writes a row: `flushSegment('timeout')`
+ships the failed attempt's search trajectory as a labeled miss before re-arming, and it
+counts against accuracy but not against the average click time (the `clicks` HUD counter).
 
 **Routines own their targets; `game.js` owns everything else.** Each routine exposes the
 same shape: a live `targets` array to raycast against, `start`/`update`/`stop`,
@@ -78,10 +106,11 @@ would stutter the frame.
 
 **Bot mode is a camera driver, not a separate game.** `?bot=linear` or `?bot=smoothed`
 makes `main.js` disable `controls.enabled` and pass a bot into the game. From then on
-`game.update(now)` advances the flick one frame at a time, records the bot's own rotation
-as synthetic mouse deltas, and calls the same `shoot()` a human click would. Human
-mousemove is not recorded and human clicks are ignored, so a synthetic row can never be
-contaminated. Without a bot, `game.update()` returns immediately.
+`game.update(now)` advances the flick one frame at a time, feeds the bot's own rotation into
+that frame's sample as the synthetic `dx/dy`, and (for a destructible routine) calls the
+same `shoot()` a human click would. In bot mode the `mousemove` listener is never attached
+and human clicks are ignored, so a synthetic row can never be contaminated. Without a bot,
+`game.update()` returns immediately.
 
 **The home screen is the resting state.** `main.js` runs three screens — HOME, PLAYING,
 PAUSED. Pointer lock still bounds a session, but HOME sits in front of it: Start requests
@@ -177,5 +206,5 @@ in the database — still need a human to confirm.
 ## Conventions
 
 Commit messages follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`). Keep
-modules small and single-purpose; the largest is `game.js` at ~150 lines. No dead code,
+modules small and single-purpose; the largest is `game.js` at ~340 lines. No dead code,
 no TODOs left behind, no `.env.local` in git.
