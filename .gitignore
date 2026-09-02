@@ -12,3 +12,13 @@ npm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# model/ (offline Python bot-detection pipeline)
+model/.env
+model/.venv/
+model/data/*
+!model/data/.gitkeep
+model/models/*
+!model/models/.gitkeep
+model/__pycache__/
+model/**/__pycache__/

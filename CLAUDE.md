@@ -102,7 +102,10 @@ same shape: a live `targets` array to raycast against, `start`/`update`/`stop`,
 built fresh per session, so mode and difficulty changes always take effect on the next
 start — which means `stop()` must dispose its pool or meshes accumulate in the scene.
 Targets are pooled (`createTargetPool` in `target.js`): allocating geometry mid-session
-would stutter the frame.
+would stutter the frame. The moving routines (spidershot, strafing, switching) share
+`routines/motion.js` for this: `frameDelta()` caps a single frame's elapsed time at 50ms
+so a backgrounded tab doesn't teleport a target on return, and `clampInside`/`bounce`
+implement the inset-spawn and wall-reflection invariants below.
 
 **Bot mode is a camera driver, not a separate game.** `?bot=linear` or `?bot=smoothed`
 makes `main.js` disable `controls.enabled` and pass a bot into the game. From then on
